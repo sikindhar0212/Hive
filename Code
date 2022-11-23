@@ -1,0 +1,39 @@
+CREATE TABLE CameraTable(marketplace string, customer_id string, review_id string, product_id string, product_parent string, product_title string, product_category string, star_rating int, helpful_votes int, total_votes int, vine string, verified_purchase string, review_headline string, review_body string, review_date date) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' STORED AS TEXTFILE;
+
+Load Data Local Inpath '/home/nd4m7/Downloads/CS6304_HIVE_Demo-main/data' Into  Table CameraTable;
+
+select marketplace, product_category, count(review_id),nullif(avg(star_rating),0) from CameraTable where marketplace !='US' group by marketplace, product_category;
+
+
+CREATE TABLE CameraTablePart(marketplace string, customer_id string, review_id string, product_id string, product_parent string, product_title string, product_category string, helpful_votes int, total_votes int, vine string, verified_purchase string, review_headline string, review_body string, review_date date) Partitioned By (star_rating int) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' STORED AS TEXTFILE;
+
+insert into CameraTablePart Partition (star_rating=4) select 
+marketplace, customer_id, review_id, product_id, product_parent, product_title, product_category, helpful_votes, total_votes, vine, verified_purchase, review_headline, review_body, review_date
+From CameraTable where star_rating=4;
+
+insert into CameraTablePart Partition (star_rating=2) select 
+marketplace, customer_id, review_id, product_id, product_parent, product_title, product_category, helpful_votes, total_votes, vine, verified_purchase, review_headline, review_body, review_date
+From CameraTable where star_rating=2;
+
+select star_rating,sum(helpful_votes) as hvsum,sum(total_votes) as tvsum from CameraTablePart group by star_rating order by tvsum DESC;
+
+
+CREATE TABLE CameraTableBuck(marketplace string, customer_id string, review_id string, product_id string, product_parent string, product_title string, product_category string, star_rating int, helpful_votes int, total_votes int, vine string, verified_purchase string, review_headline string, review_body string, review_date date) 
+clustered by (review_date) into 4 buckets ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n' STORED AS TEXTFILE;
+
+
+insert into CameraTableBuck select 
+marketplace, customer_id, review_id, product_id, product_parent, product_title, product_category, star_rating, helpful_votes, total_votes, vine, verified_purchase, review_headline, review_body, review_date
+From CameraTable;
+
+select min(review_date) as min_date,max(review_date) as max_date from CameraTableBuck Tablesample(Bucket 1 out of 4 on review_date);
+
+select min(review_date) as min_date,max(review_date) as max_date from CameraTableBuck Tablesample(Bucket 2 out of 4 on review_date);
+
+select min(review_date) as min_date,max(review_date) as max_date from CameraTableBuck Tablesample(Bucket 3 out of 4 on review_date);
+
+select min(review_date) as min_date,max(review_date) as max_date from CameraTableBuck Tablesample(Bucket 4 out of 4 on review_date);
+
+create temporary table temp as select product_id,avg(helpful_votes) as avg_hv,avg(total_votes) as avg_tv from CameraTable group by product_id;
+
+select * from temp where avg_hv>2;
